@@ -1,0 +1,6 @@
+*.tmp
+*.log
+/Library
+/Logs
+/Temp
+/obj
