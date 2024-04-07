@@ -144,7 +144,7 @@ public class RVOTest : MonoBehaviour
         
         for (int i = 0; i < robotCount; ++i)
         {
-            Gizmos.DrawWireCube(new Vector3(goals[i].x(), 0, goals[i].y()), Vector3.one);
+           // Gizmos.DrawWireCube(new Vector3(goals[i].x(), 0, goals[i].y()), Vector3.one);
         }
     }
 

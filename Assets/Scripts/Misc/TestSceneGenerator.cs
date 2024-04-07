@@ -15,6 +15,30 @@ public class TestSceneGenerator : EditorWindow
     bool        _trouble1 = true;
     bool        _trouble2 = true;
 
+    private void Awake()
+    {
+        _randomeRange.x = EditorPrefs.GetInt("_randomeRange_x", 100);
+        _randomeRange.y = EditorPrefs.GetInt("_randomeRange_y", 100);
+        _obstacleNum = EditorPrefs.GetInt("_obstacleNum", 100);
+        _obstacleSizeRange.x = EditorPrefs.GetInt("_obstacleSizeRange_x", 1);
+        _obstacleSizeRange.y = EditorPrefs.GetInt("_obstacleSizeRange_y", 5);
+        _trouble1 = EditorPrefs.GetBool("_trouble1", false);
+        _trouble2 = EditorPrefs.GetBool("_trouble2", false);
+
+    }
+
+    private void OnDestroy()
+    {
+        EditorPrefs.SetInt("_randomeRange_x", _randomeRange.x);
+        EditorPrefs.SetInt("_randomeRange_y", _randomeRange.y);
+        EditorPrefs.SetInt("_obstacleNum", _obstacleNum);
+        EditorPrefs.SetInt("_obstacleSizeRange_x", _obstacleSizeRange.x);
+        EditorPrefs.SetInt("_obstacleSizeRange_y", _obstacleSizeRange.y);
+        EditorPrefs.SetBool("_trouble1", _trouble1);
+        EditorPrefs.SetBool("_trouble2", _trouble2);
+    }
+
+
     void OnGUI()
     {
         _randomeRange = EditorGUILayout.Vector2IntField("随机范围", _randomeRange);

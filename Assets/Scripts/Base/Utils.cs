@@ -4,6 +4,14 @@ using System.Runtime.CompilerServices;
 
 namespace Pathfinding
 {
+    public enum HeuristicDistanceMethod
+    {
+        Manhattan,
+        Diagonal,
+        Euclidean,
+    }
+
+    public delegate double Heuristic_Func(int absDX, int absDY);
 
     public static class Utils
     {
@@ -70,6 +78,18 @@ namespace Pathfinding
             }
             return array2d;
         }
+
+
+        //Color define
+        public static readonly Color InitColor = Color.gray;
+        public static readonly Color BlockColor = new Color32(198, 40, 40, 255);
+        public static readonly Color OpenColor0 = new Color32(197, 225, 165, 255);
+        public static readonly Color VisitedColor0 = OpenColor0;
+        public static readonly Color PathColor0 = Color.green;
+
+        public static readonly Color OpenColor1 = new Color32(128, 222, 234, 255);
+        public static readonly Color VisitedColor1 = OpenColor1;
+        public static readonly Color PathColor1 = Color.yellow;
 
     }
 }

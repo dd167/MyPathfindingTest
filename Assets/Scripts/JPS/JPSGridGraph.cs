@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using RVO;
 using UnityEngine;
 
 namespace Pathfinding
@@ -14,7 +15,7 @@ namespace Pathfinding
         }
 
 
-        internal override IEnumerable<PathingNode> Neighbours(PathingNode node)
+        internal  IEnumerable<Node> Neighbours(PathingNode node)
         {
             if (node.Parent != null)
             {

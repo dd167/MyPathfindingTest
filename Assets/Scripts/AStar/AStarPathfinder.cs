@@ -1,16 +1,19 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System;
-
+using System.Runtime.InteropServices.WindowsRuntime;
+using UnityEditor.Experimental.GraphView;
 
 namespace Pathfinding
 {
-    public class AtarPathfinder : IPathfinder
+    public class AstarPathfinder : IPathfinder
     {
         private GridGraph _graph;
         private FastPriorityQueue<PathingNode> _open;
         private Vector2Int _start;
         private Vector2Int _goal;
+        public int _channel = 0;
+
 
         public override void Initialize(GridGraph graph, int maxSearchNodes)
         {
@@ -18,63 +21,118 @@ namespace Pathfinding
             _open = new FastPriorityQueue<PathingNode>(maxSearchNodes);
         }
 
-        public override List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
+        private Dictionary<Vector2Int, PathingNode> _nodeManager = new Dictionary<Vector2Int, PathingNode>();
+        public PathingNode GetOrCreatePathingNode(Vector2Int location)
         {
-            if (_graph == null)
-                return null;
+            PathingNode node = null;
+            if (!_nodeManager.TryGetValue(location, out node))
+            {
+                node = new PathingNode(location);
+                _nodeManager.Add(location, node);
+            }
+            return node;
+        }
 
+        public override PathingNode TryGetExpandedNode(Vector2Int location)
+        {
+            if (_nodeManager.TryGetValue(location, out var node))
+            {
+                return node;
+            }
+            return null;
+        }
+
+
+
+        public override void Begin(Vector2Int start, Vector2Int goal)
+        {
+            base.Begin(start, goal);
             _start = start;
             _goal = goal;
+            _open.Clear();
+            _nodeManager.Clear();
+            if (!_graph.IsNavigable(start))
+            {
+                Debug.LogError($"start {start} is not navigable!");
+                return;
+            }
+            if (!_graph.IsNavigable(goal))
+            {
+                Debug.LogError($"goal {goal} is not navigable!");
+                return;
+            }
 
-            var startNode = new PathingNode(_start) { F = 0, G = 0, Opened = true };
-            _open.Enqueue(startNode, startNode.F);
-            this.OnNodeAddOpenSet?.Invoke(startNode);
 
-            while (_open.Count != 0)
+            var pathNode = GetOrCreatePathingNode(_graph[start].location);
+            pathNode.F = 0;
+            pathNode.G = 0;
+            pathNode.Opened = true;
+
+            _open.Enqueue(pathNode, pathNode.F);
+            this.OnNodeAddOpenSet?.Invoke(pathNode);
+
+        }
+
+
+        public override bool Step()
+        {
+            if (_open.Count > 0)
             {
                 PathingNode curNode = _open.Dequeue();
                 curNode.Closed = true;
                 this.OnNodeVisited?.Invoke(curNode);
 
                 if (curNode.Location == _goal)
-                    return Trace(curNode);
-
-                foreach( var neighbour in  _graph.Neighbours(curNode) )
                 {
-                    if (neighbour.Closed)
+                    pathResult = Trace(curNode);
+                    return true;
+                }
+
+
+                foreach (var neighbourNode in _graph.Neighbours(curNode.Location))
+                {
+                    var nextNode = GetOrCreatePathingNode(neighbourNode.location);
+                    if (nextNode.Closed)
                         continue;
 
-                    double d = Utils.Heuristic_Diagonal(Math.Abs(neighbour.Location.x - curNode.Location.x),
-                                        Math.Abs(neighbour.Location.y - curNode.Location.y));
+
+                    double d = heuristicFunc(Math.Abs(nextNode.Location.x - curNode.Location.x),
+                                        Math.Abs(nextNode.Location.y - curNode.Location.y));
                     double ng = curNode.G + d;
 
-                    if (!neighbour.Opened || ng < neighbour.G)
+                    if (!nextNode.Opened || ng < nextNode.G)
                     {
-                        neighbour.G = ng;
-                        if (!neighbour.H.HasValue)
+                        nextNode.G = ng;
+                        if (!nextNode.H.HasValue)
                         {
-                            neighbour.H = Utils.Heuristic_Diagonal(Math.Abs(neighbour.Location.x - _goal.x),
-                                Math.Abs(neighbour.Location.y - _goal.y));
+                            nextNode.H = HScale * heuristicFunc(Math.Abs(nextNode.Location.x - _goal.x),
+                                Math.Abs(nextNode.Location.y - _goal.y));
                         }
-                        neighbour.F = (neighbour.G + neighbour.H.Value);
-                        neighbour.Parent = curNode;
+                        nextNode.F = (WeightOfG * nextNode.G + WeightOfH * nextNode.H.Value);
+                        nextNode.Parent = curNode;
+                        //Debug.Log($"Expand node: f={neighbour.F}, h={neighbour.H}, g={neighbour.G}");
 
-                        if (!neighbour.Opened)
+                        if (!nextNode.Opened)
                         {
-                            _open.Enqueue(neighbour, neighbour.F);
-                            neighbour.Opened = true;
+                            _open.Enqueue(nextNode, nextNode.F);
+                            nextNode.Opened = true;
 
-                            OnNodeAddOpenSet?.Invoke(neighbour);
+                            OnNodeAddOpenSet?.Invoke(nextNode);
                         }
                         else
                         {
-                            _open.UpdatePriority(neighbour, neighbour.F);
+                            _open.UpdatePriority(nextNode, nextNode.F);
                         }
                     }
                 }
+
+                return false;
+            }
+            else
+            {
+                return true;
             }
 
-            return null;
         }
     }
 }

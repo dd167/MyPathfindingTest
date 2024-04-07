@@ -3,6 +3,7 @@ using System.Collections;
 using Pathfinding;
 using System.Collections.Generic;
 using UnityEngine.AI;
+using System.Runtime.InteropServices;
 
 public class GridPathfindingTest : MonoBehaviour
 {
@@ -15,35 +16,51 @@ public class GridPathfindingTest : MonoBehaviour
     public enum Algorithms
     {
        AStar,
+       BidirectionAstar,
        JPS,
        UnityNavigate,
     }
     public  Algorithms algorithms;
+    public bool enableDiagonal;
+    public HeuristicDistanceMethod heuristicDistanceMethod;
+    public double weightOfG = 1.0;
+    public double weightOfH = 1.0;
+    public double hScale = 1.0;
+
     private Algorithms lastTestAlgorithms;
 
     class TestState
     {
         public string Name;
-        public Color PathColor = Color.green;
-        public Color OpenNodeColor = Color.white;
-        public Color VisitedNodeColor = Color.yellow;
-        public List<Vector2Int>  PathResult;
-        public List<PathingNode> OpenNodes = new List<PathingNode>();
-        public HashSet<PathingNode> VisitedNodes = new HashSet<PathingNode>();
+        public IPathfinder pathfinder;
+        public Path pathResult;
         public double CostTimeMS;
         public string extendMsg = string.Empty;
-
+        public  GridGraph.Node[,] AllGraphNodes;
+        public int totalOpenNodeCount;
+        public int visitedNodeCount;
+        
         public override string ToString()
         {
-            if( PathResult != null )
+            if (pathResult.HasPath() )
             {
-                return string.Format("{0} Found Path: {1} Node, CostTime={2}ms, VisitedNodeCount={3},OpenNodeCount={4},ExtendMsg={5}\n",
-                    Name, PathResult.Count, CostTimeMS, VisitedNodes.Count, OpenNodes.Count, extendMsg);
+                return $"Map: {AllGraphNodes.GetLength(0)}x{AllGraphNodes.GetLength(1)}\nAlgorithm:{Name}\n" +
+                    $"Found Path:{pathResult.NodeCount}\nCostTime={CostTimeMS:F2}ms\nVisitedNodeCount={visitedNodeCount}" +
+                    $"\ntotalOpenNodeCount={totalOpenNodeCount}\n";
             }
             else
             {
-                return string.Format("{0} Not Found Path: CostTime={1}ms, VisitedNodeCount={2},OpenNodeCount={3}, ExtendMsg={4}\n",
-                    Name, CostTimeMS, VisitedNodes.Count, OpenNodes.Count, extendMsg);
+                if( string.IsNullOrEmpty(extendMsg))
+                {
+                    return string.Format("{0} Not Found Path: CostTime={1}ms, VisitedNodeCount={2},totalOpenNodeCount={3}\n",
+                                       Name, CostTimeMS, visitedNodeCount, totalOpenNodeCount);
+                }
+                else
+                {
+                    return string.Format("{0} Not Found Path: CostTime={1}ms, VisitedNodeCount={2},totalOpenNodeCount={3},ext={4}\n",
+                                      Name, CostTimeMS, visitedNodeCount, totalOpenNodeCount, extendMsg);
+                }
+               
             }   
         }
     }
@@ -67,32 +84,34 @@ public class GridPathfindingTest : MonoBehaviour
 
         GridGraph testGraph = new JPSGridGraph(Utils.Array1DTo2D(gridMapData.data,
             gridMapData.gridWidth, gridMapData.gridHeight));
+        state.AllGraphNodes = testGraph._grid;
 
         JPSPathfinder pathfinder = new JPSPathfinder();
         pathfinder.Initialize(testGraph, 100000);
         pathfinder.OnNodeAddOpenSet += (node) =>
         {
-            state.OpenNodes.Add(node);
+            ++state.totalOpenNodeCount;
         };
         pathfinder.OnNodeVisited += (node) =>
         {
-            state.VisitedNodes.Add(node);
+            ++state.visitedNodeCount;
         };
+        state.pathfinder = pathfinder;
 
         System.DateTime start = System.DateTime.Now;
 
-        state.PathResult = pathfinder.FindPath(new Vector2Int(startPoint.x, startPoint.y),
+        state.pathResult = pathfinder.FindPath(new Vector2Int(startPoint.x, startPoint.y),
                    new Vector2Int(endPoint.x, endPoint.y));
 
-        state.CostTimeMS = (int)(System.DateTime.Now - start).TotalMilliseconds;
-        state.extendMsg = string.Format("JumpCostTime={0}ms", (int)pathfinder.JumpCostTime);
+        state.CostTimeMS = (System.DateTime.Now - start).TotalMilliseconds;
+        state.extendMsg = string.Format("JumpCostTime={0:F2}ms", pathfinder.JumpCostTime);
         return state;
     }
 
 
     TestState AStarTest()
     {
-        TestState state = new TestState() { Name = "AStar", VisitedNodeColor = Color.yellow*0.6f };
+        TestState state = new TestState() { Name = "AStar" };
         if (gridMapData == null)
         {
             Debug.LogError("Please assign gridMapData!");
@@ -109,26 +128,88 @@ public class GridPathfindingTest : MonoBehaviour
 
         GridGraph testGraph = new GridGraph(Utils.Array1DTo2D(gridMapData.data,
             gridMapData.gridWidth, gridMapData.gridHeight));
+        testGraph.EnableDiagonal = enableDiagonal;
+        state.AllGraphNodes = testGraph._grid;
 
-        IPathfinder pathfinder = new AtarPathfinder();
+        AstarPathfinder astarPathfinder = new AstarPathfinder();
+        astarPathfinder.heuristicDistanceMethod = this.heuristicDistanceMethod;
+        astarPathfinder.WeightOfG = weightOfG;
+        astarPathfinder.WeightOfH = weightOfH;
+        astarPathfinder.HScale = hScale;
+        state.pathfinder = astarPathfinder;
+
+        IPathfinder pathfinder = astarPathfinder;
         pathfinder.Initialize(testGraph, 100000);
         pathfinder.OnNodeAddOpenSet += (node) =>
         {
-            state.OpenNodes.Add(node);
+            ++state.totalOpenNodeCount;
         };
         pathfinder.OnNodeVisited += (node) =>
         {
-            state.VisitedNodes.Add(node);
+            ++state.visitedNodeCount;
         };
 
         System.DateTime start = System.DateTime.Now;
 
-        state.PathResult = pathfinder.FindPath(new Vector2Int(startPoint.x, startPoint.y),
+        state.pathResult = pathfinder.FindPath(new Vector2Int(startPoint.x, startPoint.y),
                    new Vector2Int(endPoint.x, endPoint.y));
 
-        state.CostTimeMS = (int)(System.DateTime.Now - start).TotalMilliseconds;
+        state.CostTimeMS = (System.DateTime.Now - start).TotalMilliseconds;
         return state;
     }
+
+
+    TestState BidirectionAstarTest()
+    {
+
+        TestState state = new TestState() { Name = "BidirectionAStar" };
+        if (gridMapData == null)
+        {
+            Debug.LogError("Please assign gridMapData!");
+            return state;
+        }
+
+
+        gridMapViewer = Object.FindObjectOfType<GridMapViewer>();
+        if (gridMapViewer != null)
+        {
+            gridMapViewer.ClearHighlight();
+            Debug.LogWarning("Get GridMapViewer!");
+        }
+
+        GridGraph testGraph = new GridGraph(Utils.Array1DTo2D(gridMapData.data,
+            gridMapData.gridWidth, gridMapData.gridHeight));
+        testGraph.EnableDiagonal = enableDiagonal;
+        state.AllGraphNodes = testGraph._grid;
+
+        BidirectionAstarPathfinder astarPathfinder = new BidirectionAstarPathfinder();
+        astarPathfinder.heuristicDistanceMethod = this.heuristicDistanceMethod;
+        astarPathfinder.WeightOfG = weightOfG;
+        astarPathfinder.WeightOfH = weightOfH;
+        astarPathfinder.HScale = hScale;
+        state.pathfinder = astarPathfinder;
+
+        IPathfinder pathfinder = astarPathfinder;
+        pathfinder.Initialize(testGraph, 100000);
+        pathfinder.OnNodeAddOpenSet += (node) =>
+        {
+            ++state.totalOpenNodeCount;
+
+        };
+        pathfinder.OnNodeVisited += (node) =>
+        {
+            ++state.visitedNodeCount;
+        };
+
+        System.DateTime start = System.DateTime.Now;
+
+        state.pathResult = pathfinder.FindPath(new Vector2Int(startPoint.x, startPoint.y),
+                   new Vector2Int(endPoint.x, endPoint.y));
+
+        state.CostTimeMS = (System.DateTime.Now - start).TotalMilliseconds;
+        return state;
+    }
+
 
 
     TestState UnityNavigateTest()
@@ -157,12 +238,14 @@ public class GridPathfindingTest : MonoBehaviour
             success = NavMesh.CalculatePath(startPos, endPos, NavMesh.AllAreas, path);
             if (success)
             {
-                if (state.PathResult == null)
-                    state.PathResult = new List<Vector2Int>();
+                if (state.pathResult == null){
+                    state.pathResult = new Path();
+                }
+                    
                 for (int i = 0; i < path.corners.Length; ++i)
                 {
-                    Vector3 p = path.corners[i];
-                    state.PathResult.Add(new Vector2Int((int)p.x, (int)p.z));
+                    //Vector3 p = path.corners[i];
+                    //state.PathResult.Add(new Vector2Int((int)p.x, (int)p.z));
                 }
 
                 startPos = path.corners[path.corners.Length - 1];
@@ -175,7 +258,7 @@ public class GridPathfindingTest : MonoBehaviour
             }
         }
         
-        state.CostTimeMS = (int)(System.DateTime.Now - start).TotalMilliseconds;
+        state.CostTimeMS = (System.DateTime.Now - start).TotalMilliseconds;
         state.extendMsg = string.Format("success={0},status={1},safeNum={2}", success, path.status.ToString(),safeNum);
         return state;
     }
@@ -183,45 +266,45 @@ public class GridPathfindingTest : MonoBehaviour
 
     void DrawPathLine( TestState state )
     {
-        string childName = state.Name + "_PathLine";
-        Transform child = transform.Find(childName);
-        if(child == null)
-        {
-            child = new GameObject(childName).transform;
-            child.SetParent(transform);
-            child.localPosition = Vector3.zero;
-        }
+        //string childName = state.Name + "_PathLine";
+        //Transform child = transform.Find(childName);
+        //if(child == null)
+        //{
+        //    child = new GameObject(childName).transform;
+        //    child.SetParent(transform);
+        //    child.localPosition = Vector3.zero;
+        //}
 
-        LineRenderer lr = child.GetComponent<LineRenderer>();
-        if( lr == null )
-        {
-            lr = child.gameObject.AddComponent<LineRenderer>();
-            lr.startColor = lr.endColor = Color.green;
-            lr.useWorldSpace = true;
-            lr.startWidth = lr.endWidth = 8f;
+        //LineRenderer lr = child.GetComponent<LineRenderer>();
+        //if( lr == null )
+        //{
+        //    lr = child.gameObject.AddComponent<LineRenderer>();
+        //    lr.startColor = lr.endColor = Color.green;
+        //    lr.useWorldSpace = true;
+        //    lr.startWidth = lr.endWidth = 8f;
 
-            Material mat = new Material(Shader.Find("Unlit/Color"));
-            mat.SetColor("_Color", state.PathColor);
-            lr.material = mat;
-        }
-        if (state.PathResult != null)
-        {
-            lr.positionCount = state.PathResult.Count;
-            for (int i = 0; i < state.PathResult.Count; ++i)
-            { 
-                Vector3 pos = new Vector3(state.PathResult[i].x + 0.5f, 0.5f, state.PathResult[i].y + 0.5f);
-                lr.SetPosition(i, pos);
-            }  
-        }
+        //    Material mat = new Material(Shader.Find("Unlit/Color"));
+        //    mat.SetColor("_Color", state.PathColor);
+        //    lr.material = mat;
+        //}
+        //if (state.PathResult != null)
+        //{
+        //    lr.positionCount = state.PathResult.Count;
+        //    for (int i = 0; i < state.PathResult.Count; ++i)
+        //    { 
+        //        Vector3 pos = new Vector3(state.PathResult[i].x + 0.5f, 0.5f, state.PathResult[i].y + 0.5f);
+        //        lr.SetPosition(i, pos);
+        //    }  
+        //}
     }
 
 
-    void DrawOpenNodes(TestState state)
+    void DrawAllNodes(TestState state)
     {
-        if (state.OpenNodes == null)
-            return;
+        int colSize = state.AllGraphNodes.GetLength(0);
+        int rowSize = state.AllGraphNodes.GetLength(1);
 
-        int nodeCount = state.OpenNodes.Count;
+        int nodeCount = colSize * rowSize;
         if (nodeCount == 0)
             return;
 
@@ -231,29 +314,37 @@ public class GridPathfindingTest : MonoBehaviour
 
         int v = 0;
         int i = 0;
-
-        for( int k = 0; k < nodeCount; ++k )
+        const float padding = 0.1f;
+        for( int col = 0; col < colSize; ++col)
         {
-            PathingNode node = state.OpenNodes[k];
-            verts[v] = new Vector3(node.Location.x, 0, node.Location.y);
-            verts[v+1] = new Vector3(node.Location.x, 0, node.Location.y+1);
-            verts[v+2] = new Vector3(node.Location.x+1, 0, node.Location.y+1);
-            verts[v+3] = new Vector3(node.Location.x+1, 0, node.Location.y);
+            for( int row = 0; row < rowSize; ++row)
+            {
+                var node = state.AllGraphNodes[col, row];
+                var location = node.location;
+              
 
-            Color color = state.VisitedNodes.Contains(node) ? state.VisitedNodeColor : state.OpenNodeColor;
-            colors[v] = colors[v + 1] = colors[v + 2] = colors[v + 3] = color;
+                verts[v] = new Vector3(location.x + padding, 0, location.y + padding);
+                verts[v + 1] = new Vector3(location.x + padding, 0, location.y + 1 - padding);
+                verts[v + 2] = new Vector3(location.x + 1 - padding, 0, location.y + 1 - padding);
+                verts[v + 3] = new Vector3(location.x + 1 - padding, 0, location.y + padding);
+
+                Color color = state.pathfinder.GetColor(node);
+                colors[v] = colors[v + 1] = colors[v + 2] = colors[v + 3] = color;
 
 
-            indecs[i++] = v;
-            indecs[i++] = v + 1;
-            indecs[i++] = v + 2;
+                indecs[i++] = v;
+                indecs[i++] = v + 1;
+                indecs[i++] = v + 2;
 
-            indecs[i++] = v;
-            indecs[i++] = v + 2;
-            indecs[i++] = v + 3;
+                indecs[i++] = v;
+                indecs[i++] = v + 2;
+                indecs[i++] = v + 3;
 
-            v += 4;
+                v += 4;
+            }
         }
+
+
 
         string childName = state.Name + "_OpenNodes";
         Transform child = transform.Find(childName);
@@ -316,7 +407,7 @@ public class GridPathfindingTest : MonoBehaviour
                 fontStyle = new GUIStyle();
                 fontStyle.normal.background = null;
                 fontStyle.normal.textColor = Color.white;
-                fontStyle.fontSize = 20;
+                fontStyle.fontSize = 12;
                 fontStyle.fontStyle = FontStyle.BoldAndItalic;
             }           
             GUI.Label(new Rect(10,10,600,500), testResutls, fontStyle);
@@ -344,12 +435,15 @@ public class GridPathfindingTest : MonoBehaviour
                 case Algorithms.UnityNavigate:
                     state = UnityNavigateTest();
                     break;
+                case Algorithms.BidirectionAstar:
+                    state = BidirectionAstarTest();
+                    break;
             }
             lastTestAlgorithms = algorithms;
-            testResutls += state.ToString();
+            testResutls = state.ToString();
             Debug.Log(testResutls);
-            DrawPathLine(state);
-            DrawOpenNodes(state);
+            //DrawPathLine(state);
+            DrawAllNodes(state);
         }
     }
 }

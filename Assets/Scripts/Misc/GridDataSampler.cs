@@ -12,11 +12,13 @@ public class GridDataSampler : EditorWindow
 
     Vector2 _sampleRange = new Vector2(1500, 1500);
     Vector2 _sampleUnit = Vector2.one;
+    string _saveAsset = "Assets/Model/gridmapdata.asset";
 
     private void OnGUI()
     {
         _sampleRange = EditorGUILayout.Vector2Field("采样范围", _sampleRange);
         _sampleUnit = EditorGUILayout.Vector2Field("采样单位", _sampleUnit);
+        _saveAsset = EditorGUILayout.TextField("保存路径", _saveAsset);
 
         GUILayout.Space(50);
 
@@ -43,7 +45,7 @@ public class GridDataSampler : EditorWindow
             gridMap.gridHeight = grid_height;
             gridMap.originPos = Vector3.zero;
             gridMap.sampleUnit = this._sampleUnit;
-            AssetDatabase.CreateAsset(gridMap, "Assets/Model/gridmapdata.asset");
+            AssetDatabase.CreateAsset(gridMap, _saveAsset);
             AssetDatabase.SaveAssets();
 
 

@@ -2,6 +2,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEditor.Experimental.GraphView;
 
 namespace Pathfinding
 {
@@ -11,6 +12,19 @@ namespace Pathfinding
         private FastPriorityQueue<PathingNode> _open;
         private Vector2Int _start;
         private Vector2Int _goal;
+
+        private Dictionary<Vector2Int, PathingNode> _nodeManager = new Dictionary<Vector2Int, PathingNode>();
+        public PathingNode GetOrCreatePathingNode(Vector2Int location)
+        {
+            PathingNode node = null;
+            if (!_nodeManager.TryGetValue(location, out node))
+            {
+                node = new PathingNode(location);
+                _nodeManager.Add(location, node);
+            }
+            return node;
+        }
+
 
         public double JumpCostTime { get; private set; }
 
@@ -24,7 +38,7 @@ namespace Pathfinding
             _open = new FastPriorityQueue<PathingNode>(maxSearchNodes);
         }
 
-        public override List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
+        public override Path FindPath(Vector2Int start, Vector2Int goal)
         {
             if (_graph == null)
                 return null;
@@ -33,7 +47,11 @@ namespace Pathfinding
             _goal = goal;
             JumpCostTime = 0;
 
-            var startNode = new PathingNode(_start) { F = 0, G = 0, Opened = true };
+            var startNode = GetOrCreatePathingNode(_start);
+            startNode.F = 0;
+            startNode.G = 0;
+            startNode.Opened = true;
+          
 
             _open.Enqueue(startNode, startNode.F);
             this.OnNodeAddOpenSet?.Invoke(startNode);
@@ -46,7 +64,11 @@ namespace Pathfinding
                 this.OnNodeVisited?.Invoke(node);
 
                 if (node.Location == _goal)
-                    return Trace(node);
+                {
+                    pathResult = Trace(node);
+                    return pathResult;
+                }
+                    
 
                 IdentitySuccessors(node);
             }
@@ -58,15 +80,18 @@ namespace Pathfinding
 
         private void IdentitySuccessors(PathingNode node)
         {
-            foreach (PathingNode neighbour in _graph.Neighbours(node))
+            foreach (GridGraph.Node neighbour in _graph.Neighbours(node))
             {
+                PathingNode nextNode = GetOrCreatePathingNode(neighbour.location);
+
+
                 System.DateTime s = System.DateTime.Now;
-                Vector2Int jumpPoint = Jump(neighbour.Location, node.Location);
+                Vector2Int jumpPoint = Jump(nextNode.Location, node.Location);
                 JumpCostTime += ((System.DateTime.Now - s).TotalMilliseconds);
 
                 if ( jumpPoint != Utils.InvalidGrid )
                 {
-                    PathingNode jumpNode = _graph[jumpPoint];
+                    PathingNode jumpNode = GetOrCreatePathingNode(jumpPoint);
 
                     if (jumpNode.Closed)
                         continue;
