@@ -10,8 +10,6 @@ namespace Pathfinding
     {     
         private JPSGridGraph _graph;
         private FastPriorityQueue<PathingNode> _open;
-        private Vector2Int _start;
-        private Vector2Int _goal;
 
         private Dictionary<Vector2Int, PathingNode> _nodeManager = new Dictionary<Vector2Int, PathingNode>();
         public PathingNode GetOrCreatePathingNode(Vector2Int location)
@@ -38,25 +36,24 @@ namespace Pathfinding
             _open = new FastPriorityQueue<PathingNode>(maxSearchNodes);
         }
 
-        public override Path FindPath(Vector2Int start, Vector2Int goal)
+        public override void Begin(Vector2Int start, Vector2Int goal)
         {
-            if (_graph == null)
-                return null;
-
-            _start = start;
-            _goal = goal;
+            base.Begin(start, goal);
             JumpCostTime = 0;
 
             var startNode = GetOrCreatePathingNode(_start);
             startNode.F = 0;
             startNode.G = 0;
             startNode.Opened = true;
-          
+
 
             _open.Enqueue(startNode, startNode.F);
             this.OnNodeAddOpenSet?.Invoke(startNode);
+        }
 
-            while (_open.Count != 0)
+        public override bool Step()
+        {
+            if (_open.Count > 0)
             {
                 PathingNode node = _open.Dequeue();
 
@@ -66,17 +63,17 @@ namespace Pathfinding
                 if (node.Location == _goal)
                 {
                     pathResult = Trace(node);
-                    return pathResult;
+                    return true;
                 }
-                    
+
 
                 IdentitySuccessors(node);
+                return false;
             }
-
-            return null;
+            return true;
         }
 
-  
+       
 
         private void IdentitySuccessors(PathingNode node)
         {

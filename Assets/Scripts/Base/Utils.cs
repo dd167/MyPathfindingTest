@@ -86,6 +86,8 @@ namespace Pathfinding
         public static readonly Color OpenColor0 = new Color32(197, 225, 165, 255);
         public static readonly Color VisitedColor0 = OpenColor0;
         public static readonly Color PathColor0 = Color.green;
+        public static readonly Color startColor = Color.red;
+        public static readonly Color endColor = Color.blue;
 
         public static readonly Color OpenColor1 = new Color32(128, 222, 234, 255);
         public static readonly Color VisitedColor1 = OpenColor1;

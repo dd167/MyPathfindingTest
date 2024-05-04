@@ -25,7 +25,7 @@ public class GridPathfindingTest : MonoBehaviour
     public HeuristicDistanceMethod heuristicDistanceMethod;
     public double weightOfG = 1.0;
     public double weightOfH = 1.0;
-    public double hScale = 1.0;
+    public double hScale = 0.999;
 
     private Algorithms lastTestAlgorithms;
 
@@ -42,7 +42,7 @@ public class GridPathfindingTest : MonoBehaviour
         
         public override string ToString()
         {
-            if (pathResult.HasPath() )
+            if (AllGraphNodes != null && pathResult != null && pathResult.HasPath() )
             {
                 return $"Map: {AllGraphNodes.GetLength(0)}x{AllGraphNodes.GetLength(1)}\nAlgorithm:{Name}\n" +
                     $"Found Path:{pathResult.NodeCount}\nCostTime={CostTimeMS:F2}ms\nVisitedNodeCount={visitedNodeCount}" +
@@ -52,12 +52,12 @@ public class GridPathfindingTest : MonoBehaviour
             {
                 if( string.IsNullOrEmpty(extendMsg))
                 {
-                    return string.Format("{0} Not Found Path: CostTime={1}ms, VisitedNodeCount={2},totalOpenNodeCount={3}\n",
+                    return string.Format("{0} Not Found Path: CostTime={1:F2}ms, VisitedNodeCount={2},totalOpenNodeCount={3}\n",
                                        Name, CostTimeMS, visitedNodeCount, totalOpenNodeCount);
                 }
                 else
                 {
-                    return string.Format("{0} Not Found Path: CostTime={1}ms, VisitedNodeCount={2},totalOpenNodeCount={3},ext={4}\n",
+                    return string.Format("{0} Not Found Path: CostTime={1:F2}ms, VisitedNodeCount={2},totalOpenNodeCount={3},ext={4}\n",
                                       Name, CostTimeMS, visitedNodeCount, totalOpenNodeCount, extendMsg);
                 }
                
@@ -216,18 +216,19 @@ public class GridPathfindingTest : MonoBehaviour
     {
         TestState state = new TestState() { Name = "UnityNavigate" };
 
-        //GameObject agent = new GameObject("UnityNavigateAgent");
-        //agent.transform.SetParent(transform);
-        //NavMeshAgent navAgent = agent.AddComponent<NavMeshAgent>();
-        //navAgent.updatePosition = false;
-        //NavMesh.pathfindingIterationsPerFrame = int.MaxValue;
+
+        GameObject agent = new GameObject("UnityNavigateAgent");
+        agent.transform.SetParent(transform);
+        NavMeshAgent navAgent = agent.AddComponent<NavMeshAgent>();
+        navAgent.updatePosition = false;
+        NavMesh.pathfindingIterationsPerFrame = int.MaxValue;
        
 
         Vector3 startPos = new Vector3(this.startPoint.x + 0.5f, 0, this.startPoint.y + 0.5f);
         Vector3 endPos = new Vector3(this.endPoint.x + 0.5f, 0, this.endPoint.y + 0.5f);
         
         NavMeshPath path = new NavMeshPath();
-        //agent.transform.position = startPos;
+        agent.transform.position = startPos;
 
         System.DateTime start = System.DateTime.Now;
         bool success = false;
@@ -244,8 +245,9 @@ public class GridPathfindingTest : MonoBehaviour
                     
                 for (int i = 0; i < path.corners.Length; ++i)
                 {
-                    //Vector3 p = path.corners[i];
-                    //state.PathResult.Add(new Vector2Int((int)p.x, (int)p.z));
+                    Vector3 p = path.corners[i];
+                    var node = new PathingNode((int)p.x, (int)p.z);
+                    state.pathResult.AddNode(node);
                 }
 
                 startPos = path.corners[path.corners.Length - 1];
@@ -266,41 +268,43 @@ public class GridPathfindingTest : MonoBehaviour
 
     void DrawPathLine( TestState state )
     {
-        //string childName = state.Name + "_PathLine";
-        //Transform child = transform.Find(childName);
-        //if(child == null)
-        //{
-        //    child = new GameObject(childName).transform;
-        //    child.SetParent(transform);
-        //    child.localPosition = Vector3.zero;
-        //}
+        string childName = state.Name + "_PathLine";
+        Transform child = transform.Find(childName);
+        if (child == null)
+        {
+            child = new GameObject(childName).transform;
+            child.SetParent(transform);
+            child.localPosition = Vector3.zero;
+        }
 
-        //LineRenderer lr = child.GetComponent<LineRenderer>();
-        //if( lr == null )
-        //{
-        //    lr = child.gameObject.AddComponent<LineRenderer>();
-        //    lr.startColor = lr.endColor = Color.green;
-        //    lr.useWorldSpace = true;
-        //    lr.startWidth = lr.endWidth = 8f;
+        LineRenderer lr = child.GetComponent<LineRenderer>();
+        if (lr == null)
+        {
+            lr = child.gameObject.AddComponent<LineRenderer>();
+            lr.startColor = lr.endColor = Color.green;
+            lr.useWorldSpace = true;
+            lr.startWidth = lr.endWidth = 0.2F;
 
-        //    Material mat = new Material(Shader.Find("Unlit/Color"));
-        //    mat.SetColor("_Color", state.PathColor);
-        //    lr.material = mat;
-        //}
-        //if (state.PathResult != null)
-        //{
-        //    lr.positionCount = state.PathResult.Count;
-        //    for (int i = 0; i < state.PathResult.Count; ++i)
-        //    { 
-        //        Vector3 pos = new Vector3(state.PathResult[i].x + 0.5f, 0.5f, state.PathResult[i].y + 0.5f);
-        //        lr.SetPosition(i, pos);
-        //    }  
-        //}
+            Material mat = new Material(Shader.Find("Unlit/Color"));
+            mat.SetColor("_Color", Utils.PathColor0);
+            lr.material = mat;
+        }
+        if (state.pathResult != null)
+        {
+            lr.positionCount = state.pathResult.nodeList.Count;
+            for (int i = 0; i < state.pathResult.nodeList.Count; ++i)
+            {
+                var localtion = state.pathResult.nodeList[i].Location;
+                Vector3 pos = new Vector3(localtion.x + 0.5f, 0.5f, localtion.y + 0.5f);
+                lr.SetPosition(i, pos);
+            }
+        }
     }
 
 
     void DrawAllNodes(TestState state)
     {
+      
         int colSize = state.AllGraphNodes.GetLength(0);
         int rowSize = state.AllGraphNodes.GetLength(1);
 
@@ -406,8 +410,8 @@ public class GridPathfindingTest : MonoBehaviour
             {
                 fontStyle = new GUIStyle();
                 fontStyle.normal.background = null;
-                fontStyle.normal.textColor = Color.white;
-                fontStyle.fontSize = 12;
+                fontStyle.normal.textColor = Color.blue;
+                fontStyle.fontSize = 22;
                 fontStyle.fontStyle = FontStyle.BoldAndItalic;
             }           
             GUI.Label(new Rect(10,10,600,500), testResutls, fontStyle);
@@ -424,6 +428,7 @@ public class GridPathfindingTest : MonoBehaviour
             }
 
             TestState state = null;
+            bool isGrid = true;
             switch (algorithms)
             {
                 case Algorithms.AStar:
@@ -434,6 +439,7 @@ public class GridPathfindingTest : MonoBehaviour
                     break;
                 case Algorithms.UnityNavigate:
                     state = UnityNavigateTest();
+                    isGrid = false;
                     break;
                 case Algorithms.BidirectionAstar:
                     state = BidirectionAstarTest();
@@ -442,8 +448,16 @@ public class GridPathfindingTest : MonoBehaviour
             lastTestAlgorithms = algorithms;
             testResutls = state.ToString();
             Debug.Log(testResutls);
-            //DrawPathLine(state);
-            DrawAllNodes(state);
+            if(!isGrid)
+            {
+                DrawPathLine(state);
+            }
+            else
+            {
+                DrawAllNodes(state);
+            }
+         
+            
         }
     }
 }

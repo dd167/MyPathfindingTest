@@ -159,14 +159,27 @@ namespace Pathfinding
                 var bNode = _backwardFinder.TryGetExpandedNode(node.location);
                 if (isPath)
                 {
-                    if( fNode != null)
+                    if (node.location == _start)
                     {
-                        return Utils.PathColor0;
+                        return Utils.startColor;
+                    }
+                    else if (node.location == _goal)
+                    {
+                        return Utils.endColor;
                     }
                     else
                     {
-                        return Utils.PathColor1;
+                        if (fNode != null)
+                        {
+                            return Utils.PathColor0;
+                        }
+                        else
+                        {
+                            return Utils.PathColor1;
+                        }
                     }
+
+                   
                 }
                 else
                 {

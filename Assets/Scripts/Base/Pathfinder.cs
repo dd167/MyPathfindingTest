@@ -12,7 +12,7 @@ namespace Pathfinding
 {
     public class Path
     {
-        private List<PathingNode> nodeList = new List<PathingNode>();
+        public List<PathingNode> nodeList = new List<PathingNode>();
         private HashSet<Vector2Int> nodeSets = new HashSet<Vector2Int>();
 
         public void AddNode(PathingNode node)
@@ -52,10 +52,13 @@ namespace Pathfinding
         public HeuristicDistanceMethod heuristicDistanceMethod;
         public double WeightOfG = 1.0;
         public double WeightOfH = 1.0;
-        public double HScale = 1.0;
+        public double HScale = 0.999;
 
         protected Path pathResult;
         protected Heuristic_Func heuristicFunc;
+        protected Vector2Int _start;
+        protected Vector2Int _goal;
+
         public Path GetPath() { return pathResult; }
 
         public virtual PathingNode TryGetExpandedNode(Vector2Int location)
@@ -67,6 +70,8 @@ namespace Pathfinding
         public virtual void Begin(Vector2Int start, Vector2Int goal)
         {
             pathResult = null;
+            _start = start;
+            _goal = goal;
             switch (heuristicDistanceMethod)
             {
                 case HeuristicDistanceMethod.Diagonal:
@@ -123,8 +128,17 @@ namespace Pathfinding
             }
             else
             {
-                if (pathResult != null && pathResult.Contains(node.location))
+                if( node.location == _start)
                 {
+                    return Utils.startColor;
+                }
+                else if( node.location == _goal)
+                {
+                    return Utils.endColor;
+                }
+                else if (pathResult != null && pathResult.Contains(node.location))
+                {
+                    
                     return Utils.PathColor0;
                 }
                 else
